@@ -1,6 +1,7 @@
 """
 Interactive CLI for the AI Packet Analyzer.
-Provides a user-friendly menu-driven interface for pcap analysis.
+Provides a user-friendly menu-driven interface for pcap analysis
+with optional LLM-enhanced deep analysis.
 """
 
 from __future__ import annotations
@@ -16,7 +17,7 @@ from rich import box
 
 from .packet_parser import parse_pcap, PacketStats
 from .ai_engine import analyze_connectivity, analyze_security, AnalysisReport
-from .report_renderer import render_report
+from .report_renderer import render_report, render_llm_analysis
 
 
 console = Console()
@@ -43,11 +44,23 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
+  # Basic usage (heuristic analysis only)
   ai-packet-analyzer capture.pcap
   ai-packet-analyzer capture.pcap --mode troubleshoot
   ai-packet-analyzer capture.pcap --mode security
+
+  # With LLM-enhanced analysis
+  ai-packet-analyzer capture.pcap --llm openai
+  ai-packet-analyzer capture.pcap --llm anthropic --llm-model claude-sonnet-4-20250514
+  ai-packet-analyzer capture.pcap --llm openrouter --llm-model anthropic/claude-sonnet-4
+  ai-packet-analyzer capture.pcap --llm ollama --llm-model llama3
+  ai-packet-analyzer capture.pcap --llm local --llm-base-url http://localhost:1234/v1/chat/completions
+
+  # LLM with interactive follow-up questions
+  ai-packet-analyzer capture.pcap --llm openai --interactive-llm
+
+  # Filtering
   ai-packet-analyzer capture.pcap --mode troubleshoot --ip 192.168.1.10 --port 80
-  ai-packet-analyzer capture.pcap --verbose
         """,
     )
     parser.add_argument(
@@ -92,7 +105,68 @@ Examples:
         help="Save report output to a text file.",
     )
 
+    # ─── LLM Options ───
+    llm_group = parser.add_argument_group("LLM-Enhanced Analysis")
+    llm_group.add_argument(
+        "--llm",
+        metavar="PROVIDER",
+        help=(
+            "Enable LLM deep analysis. Providers: openai, anthropic, openrouter, "
+            "local, ollama, lmstudio, chatgpt, claude."
+        ),
+    )
+    llm_group.add_argument(
+        "--llm-api-key",
+        metavar="KEY",
+        help="API key for the LLM provider (or set via environment variable).",
+    )
+    llm_group.add_argument(
+        "--llm-model",
+        metavar="MODEL",
+        help="Model name to use (default depends on provider).",
+    )
+    llm_group.add_argument(
+        "--llm-base-url",
+        metavar="URL",
+        help="Custom API endpoint URL (for local LLMs or proxies).",
+    )
+    llm_group.add_argument(
+        "--llm-temperature",
+        type=float,
+        default=0.3,
+        metavar="TEMP",
+        help="LLM temperature (0.0-1.0, default: 0.3).",
+    )
+    llm_group.add_argument(
+        "--llm-max-tokens",
+        type=int,
+        default=4096,
+        metavar="N",
+        help="Max tokens for LLM response (default: 4096).",
+    )
+    llm_group.add_argument(
+        "--interactive-llm",
+        action="store_true",
+        help="After LLM analysis, enter an interactive Q&A loop to ask follow-up questions.",
+    )
+    llm_group.add_argument(
+        "--llm-question",
+        metavar="QUESTION",
+        help="Ask a specific question to the LLM instead of running the default analysis.",
+    )
+    llm_group.add_argument(
+        "--list-providers",
+        action="store_true",
+        help="List all supported LLM providers and exit.",
+    )
+
     args = parser.parse_args()
+
+    # Handle --list-providers
+    if args.list_providers:
+        from .llm_providers import list_providers
+        console.print(list_providers())
+        sys.exit(0)
 
     # Show banner
     console.print(BANNER, style="bold cyan")
@@ -133,7 +207,7 @@ Examples:
     if mode == "interactive":
         mode = _interactive_mode_selection()
 
-    # Run analysis based on mode
+    # Run heuristic analysis
     if mode == "troubleshoot":
         report = _run_troubleshooting(stats, args)
     elif mode == "security":
@@ -142,13 +216,26 @@ Examples:
         console.print(f"[bold red]Unknown mode:[/bold red] {mode}")
         sys.exit(1)
 
-    # Render report
+    # Render heuristic report
     render_report(report, console=console, verbose=args.verbose)
 
-    # Save to file if requested
+    # ─── LLM-Enhanced Analysis ───
+    llm_result = None
+
+    # If no --llm flag, offer LLM in interactive mode
+    if not args.llm and args.mode == "interactive":
+        llm_result = _offer_llm_interactively(stats, report, mode, args)
+    elif args.llm:
+        llm_result = _run_llm_analysis(stats, report, mode, args)
+
+    # Interactive follow-up loop
+    if args.interactive_llm and args.llm:
+        _interactive_llm_loop(stats, report, mode, args, llm_result)
+
+    # Save to file
     if args.output:
         from .report_renderer import render_report_to_string
-        output_text = render_report_to_string(report, verbose=args.verbose)
+        output_text = render_report_to_string(report, verbose=args.verbose, llm_result=llm_result)
         Path(args.output).write_text(output_text)
         console.print(f"[green]Report saved to {args.output}[/green]")
 
@@ -179,7 +266,6 @@ def _run_troubleshooting(stats: PacketStats, args) -> AnalysisReport:
     description = args.description
 
     # Check if multiple issues were found and offer to narrow down
-    # First, do a broad scan
     initial_report = analyze_connectivity(stats)
     issue_count = len(initial_report.findings)
 
@@ -233,6 +319,163 @@ def _run_security_audit(stats: PacketStats, args) -> AnalysisReport:
     )
 
     return report
+
+
+def _offer_llm_interactively(stats, report, mode, args):
+    """In interactive mode, offer LLM analysis after heuristic results."""
+    console.print()
+    console.print("[bold]Would you like to run LLM-enhanced deep analysis?[/bold]\n")
+    console.print("  An LLM can provide root cause analysis, attack chain identification,")
+    console.print("  compliance impact assessment, and correlated findings.\n")
+    console.print("  Supported providers: [cyan]openai[/cyan], [cyan]anthropic[/cyan], [cyan]openrouter[/cyan], [cyan]local/ollama[/cyan]\n")
+
+    if not Confirm.ask("Enable LLM analysis?", default=False):
+        return None
+
+    provider = Prompt.ask(
+        "[bold]LLM provider[/bold]",
+        choices=["openai", "anthropic", "openrouter", "local"],
+        default="openai",
+    )
+
+    api_key = None
+    if provider != "local":
+        from .llm_providers import ENV_KEYS, LLMProvider
+        provider_enum = {
+            "openai": LLMProvider.OPENAI,
+            "anthropic": LLMProvider.ANTHROPIC,
+            "openrouter": LLMProvider.OPENROUTER,
+        }.get(provider)
+        env_var = ENV_KEYS.get(provider_enum, "")
+        existing_key = __import__("os").environ.get(env_var, "")
+
+        if existing_key:
+            console.print(f"  [green]Using API key from {env_var}[/green]")
+        else:
+            api_key = Prompt.ask(f"[bold]Enter your API key[/bold] (or set {env_var})")
+
+    model = Prompt.ask("[bold]Model name[/bold] (press Enter for default)", default="")
+    model = model.strip() or None
+
+    # Create config and run
+    from .llm_providers import LLMConfig
+    config = LLMConfig.from_args(
+        provider=provider,
+        api_key=api_key,
+        model=model,
+    )
+
+    return _execute_llm_analysis(config, stats, report, mode, args)
+
+
+def _run_llm_analysis(stats, report, mode, args):
+    """Run LLM analysis from CLI arguments."""
+    from .llm_providers import LLMConfig, validate_config
+
+    try:
+        config = LLMConfig.from_args(
+            provider=args.llm,
+            api_key=args.llm_api_key,
+            model=args.llm_model,
+            base_url=args.llm_base_url,
+            temperature=args.llm_temperature,
+            max_tokens=args.llm_max_tokens,
+        )
+    except ValueError as e:
+        console.print(f"[bold red]LLM Configuration Error:[/bold red] {e}")
+        return None
+
+    # Validate
+    is_valid, error_msg = validate_config(config)
+    if not is_valid:
+        console.print(f"[bold red]LLM Error:[/bold red] {error_msg}")
+        return None
+
+    return _execute_llm_analysis(config, stats, report, mode, args)
+
+
+def _execute_llm_analysis(config, stats, report, mode, args):
+    """Execute the LLM analysis and render results."""
+    from .llm_analyzer import run_llm_analysis
+
+    mode_str = "security" if mode == "security" else "troubleshooting"
+    problem_desc = getattr(args, 'description', None)
+    custom_question = getattr(args, 'llm_question', None)
+
+    console.print()
+    with console.status(
+        f"[bold magenta]Running LLM deep analysis ({config.provider.value} / {config.get_model()})...[/bold magenta]",
+        spinner="dots",
+    ):
+        llm_result = run_llm_analysis(
+            config=config,
+            stats=stats,
+            report=report,
+            mode=mode_str,
+            problem_description=problem_desc,
+            custom_question=custom_question,
+        )
+
+    # Render the LLM output
+    render_llm_analysis(llm_result, console=console)
+
+    return llm_result
+
+
+def _interactive_llm_loop(stats, report, mode, args, initial_llm_result):
+    """Interactive follow-up Q&A loop with the LLM."""
+    from .llm_providers import LLMConfig
+    from .llm_analyzer import run_interactive_followup
+
+    try:
+        config = LLMConfig.from_args(
+            provider=args.llm,
+            api_key=args.llm_api_key,
+            model=args.llm_model,
+            base_url=args.llm_base_url,
+            temperature=args.llm_temperature,
+            max_tokens=args.llm_max_tokens,
+        )
+    except ValueError:
+        return
+
+    mode_str = "security" if mode == "security" else "troubleshooting"
+    previous_analysis = initial_llm_result.content if initial_llm_result and initial_llm_result.success else None
+
+    console.print(Panel(
+        "[bold]Interactive LLM Q&A[/bold]\n"
+        "Ask follow-up questions about the packet capture.\n"
+        "Type [bold cyan]quit[/bold cyan] or [bold cyan]exit[/bold cyan] to stop.",
+        box=box.ROUNDED,
+        style="magenta",
+    ))
+
+    while True:
+        console.print()
+        question = Prompt.ask("[bold magenta]Your question[/bold magenta]")
+
+        if question.strip().lower() in ("quit", "exit", "q", ""):
+            console.print("[dim]Exiting interactive LLM session.[/dim]")
+            break
+
+        with console.status("[bold magenta]Thinking...[/bold magenta]", spinner="dots"):
+            followup_result = run_interactive_followup(
+                config=config,
+                stats=stats,
+                report=report,
+                mode=mode_str,
+                question=question,
+                previous_analysis=previous_analysis,
+            )
+
+        render_llm_analysis(followup_result, console=console)
+
+        # Accumulate context for conversation continuity
+        if followup_result.success:
+            previous_analysis = (
+                (previous_analysis or "")
+                + f"\n\n---\nQ: {question}\nA: {followup_result.content}"
+            )
 
 
 if __name__ == "__main__":

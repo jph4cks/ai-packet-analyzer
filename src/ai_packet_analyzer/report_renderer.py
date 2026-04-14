@@ -202,10 +202,52 @@ def _render_severity_bar(report: AnalysisReport, console: Console) -> None:
     console.print()
 
 
-def render_report_to_string(report: AnalysisReport, verbose: bool = False) -> str:
+def render_llm_analysis(llm_result, console: Console | None = None) -> None:
+    """
+    Render LLM-enhanced analysis to the console.
+
+    Args:
+        llm_result: LLMAnalysis object from llm_analyzer.
+        console: Rich console instance.
+    """
+    if console is None:
+        console = Console()
+
+    if not llm_result.success:
+        console.print(Panel(
+            f"[bold red]LLM Analysis Failed[/bold red]\n\n{llm_result.error}",
+            title="LLM Error",
+            border_style="red",
+            box=box.ROUNDED,
+        ))
+        return
+
+    # Header
+    model_info = f"{llm_result.provider} / {llm_result.model}"
+    token_info = ""
+    if llm_result.input_tokens or llm_result.output_tokens:
+        token_info = f"  ({llm_result.input_tokens:,} in / {llm_result.output_tokens:,} out tokens)"
+
+    console.print(Panel(
+        f"[bold magenta]LLM Deep Analysis[/bold magenta]  —  {model_info}{token_info}",
+        box=box.DOUBLE,
+        style="magenta",
+    ))
+    console.print()
+
+    # Render the markdown content from the LLM
+    from rich.markdown import Markdown
+    md = Markdown(llm_result.content)
+    console.print(md)
+    console.print()
+
+
+def render_report_to_string(report: AnalysisReport, verbose: bool = False, llm_result=None) -> str:
     """Render a report to a plain-text string (for file output or testing)."""
     from io import StringIO
     string_io = StringIO()
     console = Console(file=string_io, force_terminal=False, width=120)
     render_report(report, console=console, verbose=verbose)
+    if llm_result and llm_result.success:
+        render_llm_analysis(llm_result, console=console)
     return string_io.getvalue()

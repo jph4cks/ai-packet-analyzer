@@ -3,12 +3,13 @@
 <p align="center">
   <img src="https://img.shields.io/badge/python-3.9%2B-blue" alt="Python 3.9+">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License">
-  <img src="https://img.shields.io/badge/version-1.0.0-orange" alt="Version 1.0.0">
+  <img src="https://img.shields.io/badge/version-1.1.0-orange" alt="Version 1.1.0">
+  <img src="https://img.shields.io/badge/LLM-OpenAI%20%7C%20Anthropic%20%7C%20OpenRouter%20%7C%20Ollama-blueviolet" alt="LLM Support">
 </p>
 
-**AI Packet Analyzer** is an intelligent, interactive command-line tool that analyzes network packet captures (`.pcap` / `.pcapng` files) using heuristic AI to provide actionable insights for **connectivity troubleshooting** and **security auditing**.
+**AI Packet Analyzer** is an intelligent, interactive command-line tool that analyzes network packet captures (`.pcap` / `.pcapng` files) using heuristic analysis **and optional LLM-powered deep analysis** for **connectivity troubleshooting** and **security auditing**.
 
-Instead of manually sifting through thousands of packets in Wireshark, point this tool at a capture file and get a prioritized, severity-ranked report with clear explanations and recommendations — in seconds.
+Instead of manually sifting through thousands of packets in Wireshark, point this tool at a capture file and get a prioritized, severity-ranked report with clear explanations and recommendations — in seconds. Optionally connect an LLM (OpenAI, Anthropic, OpenRouter, or a local model like Ollama) for root cause analysis, attack chain identification, compliance mapping, and interactive Q&A.
 
 ---
 
@@ -18,6 +19,14 @@ Instead of manually sifting through thousands of packets in Wireshark, point thi
 - [Architecture](#architecture)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
+- [LLM Integration](#llm-integration)
+  - [Supported Providers](#supported-providers)
+  - [Using OpenAI / ChatGPT](#using-openai--chatgpt)
+  - [Using Anthropic / Claude](#using-anthropic--claude)
+  - [Using OpenRouter](#using-openrouter)
+  - [Using Local LLMs (Ollama)](#using-local-llms-ollama)
+  - [Interactive Q&A Mode](#interactive-qa-mode)
+  - [What the LLM Adds](#what-the-llm-adds)
 - [Usage Guide](#usage-guide)
   - [Interactive Mode](#interactive-mode)
   - [Connectivity Troubleshooting](#connectivity-troubleshooting)
@@ -27,6 +36,7 @@ Instead of manually sifting through thousands of packets in Wireshark, point thi
 - [How It Works](#how-it-works)
   - [Packet Parsing Engine](#packet-parsing-engine)
   - [AI Analysis Engine](#ai-analysis-engine)
+  - [LLM Analysis Engine](#llm-analysis-engine)
   - [Connectivity Checks](#connectivity-checks)
   - [Security Checks](#security-checks)
 - [Example Output](#example-output)
@@ -71,7 +81,7 @@ Instead of manually sifting through thousands of packets in Wireshark, point thi
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                     CLI Interface (cli.py)                    │
-│         Interactive menus • Argument parsing • I/O           │
+│     Interactive menus • Argument parsing • LLM config         │
 └──────────────────────────┬──────────────────────────────────┘
                            │
                            ▼
@@ -92,6 +102,13 @@ Instead of manually sifting through thousands of packets in Wireshark, point thi
 ┌─────────────────────────────────────────────────────────────┐
 │               Report Renderer (report_renderer.py)           │
 │     Rich-powered console output • Panels • Tables • Colors   │
+└─────────────────────────────────────────────────────────────┘
+                           │  AnalysisReport (optional)
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│           LLM Analyzer (llm_analyzer.py) [Optional]           │
+│   OpenAI • Anthropic • OpenRouter • Ollama • Local LLMs      │
+│   Root cause • Attack chains • Compliance • Interactive Q&A   │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -173,7 +190,135 @@ ai-packet-analyzer capture.pcap --mode troubleshoot
 
 # Quick security audit
 ai-packet-analyzer capture.pcap --mode security
+
+# With LLM deep analysis (any provider)
+ai-packet-analyzer capture.pcap --llm openai --mode security
+ai-packet-analyzer capture.pcap --llm ollama --llm-model llama3
 ```
+
+---
+
+## LLM Integration
+
+The tool works fully without any LLM — the heuristic engine runs 20+ checks locally. When you enable an LLM provider with `--llm`, the tool sends the structured analysis data to the model for **additional deep analysis** including root cause identification, attack chain mapping, compliance impact, and interactive follow-up questions.
+
+No packet payloads or raw data are sent to the LLM — only aggregated statistics, finding summaries, and metadata.
+
+### Supported Providers
+
+| Provider | Flag | Default Model | API Key Env Variable | Cost |
+|----------|------|---------------|---------------------|------|
+| **OpenAI** | `--llm openai` | `gpt-4o` | `OPENAI_API_KEY` | Paid API |
+| **Anthropic** | `--llm anthropic` | `claude-sonnet-4-20250514` | `ANTHROPIC_API_KEY` | Paid API |
+| **OpenRouter** | `--llm openrouter` | `anthropic/claude-sonnet-4` | `OPENROUTER_API_KEY` | Pay-per-token |
+| **Ollama** | `--llm ollama` | `llama3` | None (local) | Free (local) |
+| **LM Studio** | `--llm lmstudio` | Depends on loaded model | None (local) | Free (local) |
+| **Any local server** | `--llm local` | `llama3` | None | Free (local) |
+
+Aliases: `chatgpt` → openai, `claude` → anthropic
+
+### Using OpenAI / ChatGPT
+
+```bash
+# Set API key as environment variable (recommended)
+export OPENAI_API_KEY="sk-your-key-here"
+ai-packet-analyzer capture.pcap --llm openai
+
+# Or pass inline
+ai-packet-analyzer capture.pcap --llm openai --llm-api-key sk-your-key-here
+
+# Use a specific model
+ai-packet-analyzer capture.pcap --llm openai --llm-model gpt-4o-mini
+```
+
+### Using Anthropic / Claude
+
+```bash
+export ANTHROPIC_API_KEY="sk-ant-your-key-here"
+ai-packet-analyzer capture.pcap --llm anthropic
+
+# Use a specific Claude model
+ai-packet-analyzer capture.pcap --llm claude --llm-model claude-sonnet-4-20250514
+```
+
+### Using OpenRouter
+
+[OpenRouter](https://openrouter.ai) provides access to hundreds of models through a single API. Great for trying different models.
+
+```bash
+export OPENROUTER_API_KEY="sk-or-your-key-here"
+ai-packet-analyzer capture.pcap --llm openrouter
+
+# Use any model available on OpenRouter
+ai-packet-analyzer capture.pcap --llm openrouter --llm-model google/gemini-2.5-pro
+ai-packet-analyzer capture.pcap --llm openrouter --llm-model meta-llama/llama-3-70b-instruct
+```
+
+### Using Local LLMs (Ollama)
+
+Run analysis completely offline and free using [Ollama](https://ollama.com):
+
+```bash
+# Install and start Ollama
+curl -fsSL https://ollama.com/install.sh | sh
+ollama pull llama3
+
+# Run analysis (auto-detects Ollama on localhost:11434)
+ai-packet-analyzer capture.pcap --llm ollama
+
+# Use a different model
+ai-packet-analyzer capture.pcap --llm ollama --llm-model mistral
+ai-packet-analyzer capture.pcap --llm ollama --llm-model codellama
+```
+
+For **LM Studio**, **llama.cpp server**, or **vLLM**:
+
+```bash
+# LM Studio (default port 1234)
+ai-packet-analyzer capture.pcap --llm local \
+  --llm-base-url http://localhost:1234/v1/chat/completions \
+  --llm-model my-loaded-model
+
+# llama.cpp server (default port 8080)
+ai-packet-analyzer capture.pcap --llm local \
+  --llm-base-url http://localhost:8080/v1/chat/completions
+
+# vLLM (default port 8000)
+ai-packet-analyzer capture.pcap --llm local \
+  --llm-base-url http://localhost:8000/v1/chat/completions \
+  --llm-model my-model
+```
+
+### Interactive Q&A Mode
+
+After the initial LLM analysis, enter an interactive session to ask follow-up questions:
+
+```bash
+ai-packet-analyzer capture.pcap --llm openai --interactive-llm
+```
+
+The tool maintains conversation context, so each follow-up question builds on previous answers:
+
+```
+Your question: Which host is most likely compromised?
+Your question: What lateral movement is possible from that host?
+Your question: What specific firewall rules would block this?
+Your question: quit
+```
+
+You can also ask a single targeted question without the full default analysis:
+
+```bash
+ai-packet-analyzer capture.pcap --llm openai \
+  --llm-question "Are there any signs of data exfiltration in this capture?"
+```
+
+### What the LLM Adds
+
+| Mode | Heuristic Engine (always runs) | LLM Deep Analysis (optional) |
+|------|------|------|
+| **Troubleshooting** | TCP failures, DNS errors, ICMP issues, retransmissions | Root cause correlation, prioritized action plan, diagnostic commands, network topology inference |
+| **Security** | Cleartext protocols, credentials, sensitive data patterns | Attack chain analysis, compliance mapping (PCI-DSS, HIPAA, SOC 2), risk scoring, IoC identification, remediation prioritization |
 
 ---
 
@@ -323,6 +468,25 @@ Each finding includes:
 - **Details** — Supporting data points (counts, IPs, ports, etc.)
 - **Recommendation** — Specific, actionable steps to resolve the issue
 
+### LLM Analysis Engine
+
+The **LLM Analyzer** (`llm_analyzer.py`) takes the structured output from the heuristic engine and sends it to an LLM for deeper contextual analysis. The system uses carefully engineered prompts tailored to each mode:
+
+- **Troubleshooting mode**: The LLM receives capture stats, heuristic findings, and optionally a user problem description. It correlates findings to identify root causes, suggests diagnostic commands, and infers network topology.
+- **Security mode**: The LLM receives stats, findings, cleartext traffic samples, and credential data. It maps attack chains, assesses compliance impact, calculates risk scores, and identifies indicators of compromise.
+
+The **LLM Providers** module (`llm_providers.py`) implements a zero-dependency abstraction layer using only Python's `urllib` (no SDK dependencies):
+
+| Provider | API Format | Authentication |
+|----------|-----------|----------------|
+| OpenAI / ChatGPT | OpenAI Chat Completions | Bearer token |
+| Anthropic / Claude | Anthropic Messages API | x-api-key header |
+| OpenRouter | OpenAI-compatible | Bearer token + HTTP-Referer |
+| Ollama | Ollama Chat API | None |
+| LM Studio / llama.cpp / vLLM | OpenAI-compatible | None |
+
+The provider is auto-detected based on the endpoint URL, and local LLM servers are auto-discovered by probing common ports (11434, 1234, 8080, 8000).
+
 ### Connectivity Checks
 
 | Check | What It Detects | Severity |
@@ -443,6 +607,8 @@ ai-packet-analyzer/
 │       ├── cli.py                     # Interactive CLI interface
 │       ├── packet_parser.py           # Scapy-based packet parsing engine
 │       ├── ai_engine.py               # Heuristic AI analysis engine
+│       ├── llm_providers.py           # LLM provider abstraction (OpenAI, Anthropic, etc.)
+│       ├── llm_analyzer.py            # LLM-enhanced deep analysis + prompt engineering
 │       └── report_renderer.py         # Rich-powered report rendering
 └── tests/
     └── pcaps/                         # Sample pcap files for testing
