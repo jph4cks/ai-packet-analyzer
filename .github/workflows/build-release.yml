@@ -1,0 +1,169 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact_name: ai-packet-analyzer-linux
+            asset_name: ai-packet-analyzer-linux
+          - os: windows-latest
+            artifact_name: ai-packet-analyzer.exe
+            asset_name: ai-packet-analyzer-windows.exe
+          - os: macos-latest
+            artifact_name: ai-packet-analyzer-macos
+            asset_name: ai-packet-analyzer-macos
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build binary (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: |
+          pyinstaller \
+            --onefile \
+            --name ${{ matrix.artifact_name }} \
+            --paths src \
+            --hidden-import ai_packet_analyzer \
+            --hidden-import ai_packet_analyzer.cli \
+            --hidden-import ai_packet_analyzer.packet_parser \
+            --hidden-import ai_packet_analyzer.ai_engine \
+            --hidden-import ai_packet_analyzer.report_renderer \
+            --hidden-import scapy.all \
+            --hidden-import scapy.layers.inet \
+            --hidden-import scapy.layers.dns \
+            --hidden-import scapy.layers.l2 \
+            --hidden-import rich \
+            --exclude-module tkinter \
+            --exclude-module matplotlib \
+            --exclude-module numpy \
+            --clean \
+            build_entry.py
+
+      - name: Build binary (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          pyinstaller `
+            --onefile `
+            --name ai-packet-analyzer `
+            --paths src `
+            --hidden-import ai_packet_analyzer `
+            --hidden-import ai_packet_analyzer.cli `
+            --hidden-import ai_packet_analyzer.packet_parser `
+            --hidden-import ai_packet_analyzer.ai_engine `
+            --hidden-import ai_packet_analyzer.report_renderer `
+            --hidden-import scapy.all `
+            --hidden-import scapy.layers.inet `
+            --hidden-import scapy.layers.dns `
+            --hidden-import scapy.layers.l2 `
+            --hidden-import rich `
+            --exclude-module tkinter `
+            --exclude-module matplotlib `
+            --exclude-module numpy `
+            --clean `
+            build_entry.py
+
+      - name: Rename Windows artifact
+        if: runner.os == 'Windows'
+        run: |
+          Move-Item dist/ai-packet-analyzer.exe dist/${{ matrix.asset_name }}
+
+      - name: Test binary (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: |
+          chmod +x dist/${{ matrix.artifact_name }}
+          ./dist/${{ matrix.artifact_name }} tests/pcaps/synthetic_test.pcap --mode security 2>&1 | head -5
+
+      - name: Test binary (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          dist/${{ matrix.asset_name }} tests/pcaps/synthetic_test.pcap --mode security 2>&1 | Select-Object -First 5
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset_name }}
+          path: dist/${{ matrix.asset_name }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: List artifacts
+        run: find artifacts -type f -ls
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "AI Packet Analyzer ${{ github.ref_name }}"
+          body: |
+            ## AI Packet Analyzer ${{ github.ref_name }}
+
+            ### Downloads
+
+            | Platform | File | Notes |
+            |----------|------|-------|
+            | **Linux** | `ai-packet-analyzer-linux` | x86_64 standalone binary |
+            | **Windows** | `ai-packet-analyzer-windows.exe` | x86_64 standalone executable |
+            | **macOS** | `ai-packet-analyzer-macos` | ARM64/x86_64 standalone binary |
+
+            ### Quick Start
+
+            ```bash
+            # Linux / macOS
+            chmod +x ai-packet-analyzer-linux   # or ai-packet-analyzer-macos
+            ./ai-packet-analyzer-linux capture.pcap
+
+            # Windows
+            ai-packet-analyzer-windows.exe capture.pcap
+            ```
+
+            ### What's Included
+            - Interactive CLI with connectivity troubleshooting and security audit modes
+            - 20+ heuristic AI checks for network and security analysis
+            - Credential and sensitive data detection in cleartext traffic
+            - Rich terminal output with severity-ranked findings
+
+            See the [README](https://github.com/${{ github.repository }}/blob/master/README.md) for full documentation.
+          files: |
+            artifacts/ai-packet-analyzer-linux/ai-packet-analyzer-linux
+            artifacts/ai-packet-analyzer-windows.exe/ai-packet-analyzer-windows.exe
+            artifacts/ai-packet-analyzer-macos/ai-packet-analyzer-macos
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
