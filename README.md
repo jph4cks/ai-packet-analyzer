@@ -104,11 +104,17 @@ Instead of manually sifting through thousands of packets in Wireshark, point thi
 - Python 3.9 or higher
 - `tshark` (optional, for pcapng support) — `sudo apt install tshark`
 
+### Install with pip (recommended — works on Windows, macOS, Linux)
+
+```bash
+pip install git+https://github.com/jph4cks/ai-packet-analyzer.git
+```
+
 ### Install from source
 
 ```bash
 # Clone the repository
-git clone https://github.com/YOUR_USERNAME/ai-packet-analyzer.git
+git clone https://github.com/jph4cks/ai-packet-analyzer.git
 cd ai-packet-analyzer
 
 # Create a virtual environment (recommended)
@@ -125,6 +131,25 @@ pip install .
 # Or install in development mode
 pip install -e .
 ```
+
+### Build standalone binary (any platform)
+
+```bash
+# Linux / macOS
+chmod +x build.sh && ./build.sh
+
+# Windows (PowerShell)
+pip install -r requirements.txt pyinstaller
+pyinstaller --onefile --name ai-packet-analyzer --paths src `
+  --hidden-import ai_packet_analyzer --hidden-import scapy.all `
+  --hidden-import rich --clean build_entry.py
+```
+
+The output binary will be in the `dist/` folder — a single file, no Python installation required.
+
+### CI/CD Builds (all platforms)
+
+The repository includes a **GitHub Actions workflow** that automatically builds standalone binaries for Linux, Windows, and macOS. Fork the repo and push a version tag (`v*`) to generate all three binaries as release artifacts.
 
 ### Install dependencies only
 
@@ -405,6 +430,13 @@ ai-packet-analyzer/
 ├── LICENSE                            # MIT License
 ├── requirements.txt                   # Python dependencies
 ├── setup.py                           # Package configuration
+├── pyproject.toml                     # Modern Python packaging config
+├── build.sh                           # Build script for standalone binary
+├── build_entry.py                     # PyInstaller entry point
+├── ai-packet-analyzer.spec            # PyInstaller spec file
+├── .github/
+│   └── workflows/
+│       └── build-release.yml          # CI/CD: builds Linux/Win/Mac binaries
 ├── src/
 │   └── ai_packet_analyzer/
 │       ├── __init__.py                # Package init + version
