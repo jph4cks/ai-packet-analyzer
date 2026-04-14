@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+.eggs/
+
+# Virtual environments
+venv/
+env/
+.env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test output
+*.txt
+!requirements.txt
+
+# Large pcap files (keep test ones)
+*.pcapng
+tests/pcaps/smallFlows.pcap
+tests/pcaps/netresec_proxy.pcap
