@@ -25,9 +25,9 @@ env/
 .DS_Store
 Thumbs.db
 
-# Test output
-*.txt
-!requirements.txt
+# Build artifacts
+release/
+*.spec.bak
 
 # Large pcap files (keep test ones)
 *.pcapng
