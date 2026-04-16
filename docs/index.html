@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Packet Analyzer — AI-Powered Network Forensics</title>
+  <meta name="description" content="Open-source CLI tool that analyzes network packet captures using heuristic AI and optional LLM integration for connectivity troubleshooting and security auditing.">
+  <meta property="og:title" content="AI Packet Analyzer — AI-Powered Network Forensics">
+  <meta property="og:description" content="Stop manually sifting through thousands of packets. Get severity-ranked security findings and troubleshooting insights in seconds.">
+  <meta property="og:type" content="article">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./base.css">
+  <link rel="stylesheet" href="./style.css">
+  <style>
+    :root {
+      --font-display: 'Geist Mono', monospace;
+      --font-body: 'Inter', sans-serif;
+      --font-mono: 'Geist Mono', monospace;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header class="header">
+    <div class="wrapper header__inner">
+      <a href="#" class="header__logo" aria-label="AI Packet Analyzer">
+        <svg class="header__logo-icon" width="28" height="28" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="2" y="6" width="28" height="20" rx="3" stroke="currentColor" stroke-width="2"/>
+          <path d="M8 14h4M8 18h6M20 14h4M20 18h2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          <circle cx="16" cy="16" r="2.5" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M16 10v3M16 19v3M10 16h3M19 16h3" stroke="currentColor" stroke-width="1" stroke-linecap="round" opacity="0.5"/>
+        </svg>
+        <span class="header__logo-text">ai-packet-analyzer</span>
+      </a>
+      <nav class="header__nav">
+        <a href="#features" class="header__link">Features</a>
+        <a href="#how-it-works" class="header__link">How It Works</a>
+        <a href="#llm" class="header__link">LLM Integration</a>
+        <a href="https://github.com/jph4cks/ai-packet-analyzer" target="_blank" rel="noopener noreferrer" class="header__link" aria-label="GitHub repository">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.44 9.8 8.2 11.39.6.11.82-.26.82-.58v-2.03c-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.09-.75.08-.73.08-.73 1.21.08 1.85 1.24 1.85 1.24 1.07 1.84 2.81 1.31 3.5 1 .11-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.12-.3-.54-1.52.12-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 016.02 0c2.28-1.55 3.29-1.23 3.29-1.23.66 1.66.24 2.88.12 3.18.77.84 1.24 1.91 1.24 3.22 0 4.61-2.81 5.63-5.48 5.92.43.37.81 1.1.81 2.22v3.29c0 .32.21.7.82.58C20.57 21.8 24 17.3 24 12c0-6.63-5.37-12-12-12z"/></svg>
+        </a>
+        <button class="theme-toggle" data-theme-toggle aria-label="Switch to light mode">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- HERO -->
+    <section class="hero wrapper">
+      <div class="hero__badge">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        Open Source &middot; v1.1.0
+      </div>
+      <h1 class="hero__title">Network Forensics, <span>Automated</span></h1>
+      <p class="hero__subtitle">Point this tool at any pcap file and get severity-ranked findings with clear recommendations — in seconds. No more manually sifting through thousands of packets in Wireshark.</p>
+      <div class="hero__actions">
+        <a href="https://github.com/jph4cks/ai-packet-analyzer" target="_blank" rel="noopener noreferrer" class="btn btn--primary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.44 9.8 8.2 11.39.6.11.82-.26.82-.58v-2.03c-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.09-.75.08-.73.08-.73 1.21.08 1.85 1.24 1.85 1.24 1.07 1.84 2.81 1.31 3.5 1 .11-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.12-.3-.54-1.52.12-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 016.02 0c2.28-1.55 3.29-1.23 3.29-1.23.66 1.66.24 2.88.12 3.18.77.84 1.24 1.91 1.24 3.22 0 4.61-2.81 5.63-5.48 5.92.43.37.81 1.1.81 2.22v3.29c0 .32.21.7.82.58C20.57 21.8 24 17.3 24 12c0-6.63-5.37-12-12-12z"/></svg>
+          View on GitHub
+        </a>
+        <a href="#install" class="btn btn--ghost">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+          Quick Install
+        </a>
+      </div>
+
+      <!-- Terminal Demo -->
+      <div class="terminal">
+        <div class="terminal__bar">
+          <span class="terminal__dot terminal__dot--red"></span>
+          <span class="terminal__dot terminal__dot--yellow"></span>
+          <span class="terminal__dot terminal__dot--green"></span>
+          <span class="terminal__title">ai-packet-analyzer &mdash; security audit</span>
+        </div>
+        <div class="terminal__body">
+<span class="prompt">$</span> <span class="cmd">ai-packet-analyzer capture.pcap --mode security</span>
+
+<span class="dim">  Parsing capture.pcap...</span>
+<span class="dim">  Loaded 15,482 packets (12.3 MB, 342.5s capture window)</span>
+
+<span class="box-line">╭──────────────────────────────────────────────────────────────╮</span>
+<span class="box-line">│</span> <span class="severity-critical">[!!!] CRITICAL</span> <span class="finding-title">— Cleartext Credentials Detected</span>         <span class="box-line">│</span>
+<span class="box-line">│</span>  <span class="dim">6 credential(s) found in unencrypted traffic:</span>              <span class="box-line">│</span>
+<span class="box-line">│</span>  <span class="severity-high">FTP:</span> <span class="dim">10.0.0.5 → 192.168.1.2 | USER admin / PASS ****</span>     <span class="box-line">│</span>
+<span class="box-line">│</span>  <span class="severity-high">HTTP:</span> <span class="dim">10.0.0.10 → 192.168.1.80 | Basic Auth detected</span>     <span class="box-line">│</span>
+<span class="box-line">│</span>  <span class="severity-high">Telnet:</span> <span class="dim">10.0.0.5 → 192.168.1.1 | login: root</span>           <span class="box-line">│</span>
+<span class="box-line">╰──────────────────────────────────────────────────────────────╯</span>
+
+<span class="box-line">╭──────────────────────────────────────────────────────────────╮</span>
+<span class="box-line">│</span> <span class="severity-high">[!!] HIGH</span> <span class="finding-title">— Port Scan Detected</span>                            <span class="box-line">│</span>
+<span class="box-line">│</span>  <span class="dim">10.0.0.99 scanned 25 ports on 192.168.1.50</span>                <span class="box-line">│</span>
+<span class="box-line">│</span>  <span class="dim">Open: 22 (SSH), 80 (HTTP), 443 (HTTPS), 3306 (MySQL)</span>      <span class="box-line">│</span>
+<span class="box-line">╰──────────────────────────────────────────────────────────────╯</span>
+
+<span class="box-line">╭──────────────────────────────────────────────────────────────╮</span>
+<span class="box-line">│</span> <span class="severity-medium">[!] MEDIUM</span> <span class="finding-title">— Sensitive Data in Cleartext</span>                 <span class="box-line">│</span>
+<span class="box-line">│</span>  <span class="dim">SSN pattern (123-45-****) in HTTP POST to forms.local</span>     <span class="box-line">│</span>
+<span class="box-line">│</span>  <span class="dim">Credit card (4111****) in HTTP POST to shop.local</span>         <span class="box-line">│</span>
+<span class="box-line">╰──────────────────────────────────────────────────────────────╯</span>
+
+<span class="highlight">Severity Summary:</span>  <span class="severity-critical">CRITICAL: 2</span>  <span class="severity-high">HIGH: 4</span>  <span class="severity-medium">MEDIUM: 1</span>  <span class="severity-low">LOW: 1</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- STATS BAR -->
+    <div class="wrapper">
+      <div class="stats-bar reveal">
+        <div class="stat">
+          <div class="stat__value">20+</div>
+          <div class="stat__label">Heuristic Checks</div>
+        </div>
+        <div class="stat">
+          <div class="stat__value">7</div>
+          <div class="stat__label">LLM Providers</div>
+        </div>
+        <div class="stat">
+          <div class="stat__value">0</div>
+          <div class="stat__label">Extra Dependencies for LLM</div>
+        </div>
+        <div class="stat">
+          <div class="stat__value">13+</div>
+          <div class="stat__label">Credential Patterns</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FEATURES -->
+    <section id="features" class="section wrapper reveal">
+      <div class="section__header">
+        <div class="section__label">Capabilities</div>
+        <h2 class="section__title">Two Modes. One Tool.</h2>
+        <p class="section__subtitle">Choose connectivity troubleshooting to diagnose network problems, or security audit to find vulnerabilities and exposed data.</p>
+      </div>
+
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-card__icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          </div>
+          <h3 class="feature-card__title">TCP Failure Detection</h3>
+          <p class="feature-card__desc">Detects incomplete handshakes, elevated RST rates, retransmissions, and half-open connections that indicate connectivity problems.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-card__icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
+          </div>
+          <h3 class="feature-card__title">DNS Analysis</h3>
+          <p class="feature-card__desc">Identifies NXDOMAIN failures, SERVFAIL errors, REFUSED responses, potential DNS tunneling, and unencrypted DNS traffic.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-card__icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+          </div>
+          <h3 class="feature-card__title">Credential Detection</h3>
+          <p class="feature-card__desc">Finds passwords, API keys, tokens, HTTP Basic Auth, and session cookies transmitted in cleartext using 13+ regex patterns.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-card__icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </div>
+          <h3 class="feature-card__title">Cleartext Protocol Flags</h3>
+          <p class="feature-card__desc">Flags HTTP, FTP, Telnet, SMTP, POP3, IMAP, LDAP, SNMP, and VNC traffic with migration recommendations to encrypted alternatives.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-card__icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+          </div>
+          <h3 class="feature-card__title">ARP Spoofing Detection</h3>
+          <p class="feature-card__desc">Identifies multiple MAC addresses claiming the same IP — a telltale sign of man-in-the-middle attacks on local networks.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-card__icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          </div>
+          <h3 class="feature-card__title">Sensitive Data Scanning</h3>
+          <p class="feature-card__desc">Detects Social Security numbers, credit card numbers, email addresses, private keys, and certificates in packet payloads.</p>
+        </div>
+      </div>
+    </section>
+
+    <hr class="divider wrapper">
+
+    <!-- HOW IT WORKS -->
+    <section id="how-it-works" class="section wrapper">
+      <div class="two-col reveal">
+        <div class="two-col__text">
+          <div class="two-col__label">Architecture</div>
+          <h2 class="two-col__title">Four Engines, One Pipeline</h2>
+          <p class="two-col__desc">The tool chains four specialized modules: a Scapy-based packet parser extracts structured metadata from every packet, a heuristic AI engine runs 20+ checks to generate severity-ranked findings, an optional LLM analyzer adds deep contextual intelligence, and a Rich-powered renderer produces clean, color-coded terminal output.</p>
+          <ul class="check-list">
+            <li>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+              Parses TCP, UDP, ICMP, ARP, DNS, HTTP, FTP, Telnet, SMTP
+            </li>
+            <li>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+              Severity levels: CRITICAL, HIGH, MEDIUM, LOW, INFO
+            </li>
+            <li>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+              Each finding includes actionable remediation steps
+            </li>
+            <li>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+              Supports .pcap and .pcapng file formats
+            </li>
+          </ul>
+        </div>
+        <div class="arch-diagram">
+          <div class="layer">
+            <span class="layer-name">CLI</span>
+            <span class="layer-desc">Interactive menus, argument parsing, LLM config</span>
+          </div>
+          <div class="arrow">&#x25BC;</div>
+          <div class="layer">
+            <span class="layer-name">Packet Parser</span>
+            <span class="layer-desc">Scapy engine, protocol dissection, stats extraction</span>
+          </div>
+          <div class="arrow">&#x25BC; PacketStats</div>
+          <div class="layer">
+            <span class="layer-name">AI Engine</span>
+            <span class="layer-desc">20+ heuristic checks, severity ranking, recommendations</span>
+          </div>
+          <div class="arrow">&#x25BC; AnalysisReport</div>
+          <div class="layer">
+            <span class="layer-name">Report Renderer</span>
+            <span class="layer-desc">Rich terminal output, color-coded panels, tables</span>
+          </div>
+          <div class="arrow">&#x25BC; optional</div>
+          <div class="layer" style="border-color: var(--color-primary); background: var(--color-primary-highlight);">
+            <span class="layer-name">LLM Analyzer</span>
+            <span class="layer-desc">Root cause analysis, attack chains, compliance, Q&A</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <hr class="divider wrapper">
+
+    <!-- TROUBLESHOOTING + SECURITY CHECKS -->
+    <section class="section wrapper reveal">
+      <div class="section__header">
+        <div class="section__label">Detection Matrix</div>
+        <h2 class="section__title">What It Catches</h2>
+      </div>
+
+      <div class="two-col">
+        <div>
+          <h3 style="font-family: var(--font-mono); font-size: var(--text-base); color: var(--color-primary); margin-bottom: var(--space-6);">Connectivity Troubleshooting</h3>
+          <div class="prose">
+            <table>
+              <thead><tr><th>Check</th><th>Severity</th></tr></thead>
+              <tbody>
+                <tr><td>TCP Handshake Failures</td><td><span class="severity severity--critical">CRITICAL</span></td></tr>
+                <tr><td>TCP Retransmissions</td><td><span class="severity severity--high">HIGH</span></td></tr>
+                <tr><td>TCP Reset Floods</td><td><span class="severity severity--high">HIGH</span></td></tr>
+                <tr><td>DNS NXDOMAIN/SERVFAIL</td><td><span class="severity severity--high">HIGH</span></td></tr>
+                <tr><td>ICMP Unreachable Messages</td><td><span class="severity severity--medium">MEDIUM</span></td></tr>
+                <tr><td>Ping Loss Rate</td><td><span class="severity severity--medium">MEDIUM</span></td></tr>
+                <tr><td>ARP Anomalies</td><td><span class="severity severity--high">HIGH</span></td></tr>
+                <tr><td>Traffic Black Holes</td><td><span class="severity severity--high">HIGH</span></td></tr>
+                <tr><td>One-Way Traffic</td><td><span class="severity severity--medium">MEDIUM</span></td></tr>
+                <tr><td>Port Scan Patterns</td><td><span class="severity severity--info">INFO</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div>
+          <h3 style="font-family: var(--font-mono); font-size: var(--text-base); color: var(--color-error); margin-bottom: var(--space-6);">Security Audit</h3>
+          <div class="prose">
+            <table>
+              <thead><tr><th>Check</th><th>Severity</th></tr></thead>
+              <tbody>
+                <tr><td>Cleartext Credentials</td><td><span class="severity severity--critical">CRITICAL</span></td></tr>
+                <tr><td>Telnet Usage</td><td><span class="severity severity--critical">CRITICAL</span></td></tr>
+                <tr><td>ARP Spoofing</td><td><span class="severity severity--critical">CRITICAL</span></td></tr>
+                <tr><td>Sensitive Data (SSN, CC)</td><td><span class="severity severity--high">HIGH</span></td></tr>
+                <tr><td>FTP / SMTP Cleartext</td><td><span class="severity severity--high">HIGH</span></td></tr>
+                <tr><td>DNS Tunneling</td><td><span class="severity severity--high">HIGH</span></td></tr>
+                <tr><td>HTTP Basic Auth</td><td><span class="severity severity--high">HIGH</span></td></tr>
+                <tr><td>Unencrypted HTTP Traffic</td><td><span class="severity severity--medium">MEDIUM</span></td></tr>
+                <tr><td>Suspicious Ports (C2)</td><td><span class="severity severity--medium">MEDIUM</span></td></tr>
+                <tr><td>Unencrypted DNS</td><td><span class="severity severity--low">LOW</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <hr class="divider wrapper">
+
+    <!-- LLM INTEGRATION -->
+    <section id="llm" class="section wrapper reveal">
+      <div class="section__header">
+        <div class="section__label">Powered by AI</div>
+        <h2 class="section__title">Optional LLM Deep Analysis</h2>
+        <p class="section__subtitle">Connect any LLM provider for root cause analysis, attack chain mapping, compliance impact assessment, and interactive follow-up Q&A. Zero extra dependencies needed — the provider layer uses only Python's built-in urllib.</p>
+      </div>
+
+      <div class="providers-grid">
+        <div class="provider-card">
+          <div class="provider-card__name">OpenAI / ChatGPT</div>
+          <div class="provider-card__model">gpt-4o</div>
+          <p class="provider-card__desc">Full OpenAI API support. Set OPENAI_API_KEY or pass inline with --llm-api-key.</p>
+          <span class="provider-card__badge provider-card__badge--paid">API</span>
+        </div>
+        <div class="provider-card">
+          <div class="provider-card__name">Anthropic / Claude</div>
+          <div class="provider-card__model">claude-sonnet-4-20250514</div>
+          <p class="provider-card__desc">Native Anthropic Messages API. Uses x-api-key header authentication.</p>
+          <span class="provider-card__badge provider-card__badge--paid">API</span>
+        </div>
+        <div class="provider-card">
+          <div class="provider-card__name">OpenRouter</div>
+          <div class="provider-card__model">anthropic/claude-sonnet-4</div>
+          <p class="provider-card__desc">Access hundreds of models through a single API. Great for comparing model performance.</p>
+          <span class="provider-card__badge provider-card__badge--paid">API</span>
+        </div>
+        <div class="provider-card">
+          <div class="provider-card__name">Ollama</div>
+          <div class="provider-card__model">llama3</div>
+          <p class="provider-card__desc">Run analysis completely offline and free. Auto-detects Ollama on localhost:11434.</p>
+          <span class="provider-card__badge provider-card__badge--free">Free / Local</span>
+        </div>
+        <div class="provider-card">
+          <div class="provider-card__name">LM Studio</div>
+          <div class="provider-card__model">any loaded model</div>
+          <p class="provider-card__desc">Point to any local model running in LM Studio. Default port 1234.</p>
+          <span class="provider-card__badge provider-card__badge--free">Free / Local</span>
+        </div>
+        <div class="provider-card">
+          <div class="provider-card__name">llama.cpp / vLLM</div>
+          <div class="provider-card__model">any compatible model</div>
+          <p class="provider-card__desc">Supports any OpenAI-compatible endpoint. Specify --llm-base-url to connect.</p>
+          <span class="provider-card__badge provider-card__badge--free">Free / Local</span>
+        </div>
+      </div>
+
+      <!-- LLM Terminal Demo -->
+      <div class="terminal" style="margin-top: var(--space-10); max-width: 800px;">
+        <div class="terminal__bar">
+          <span class="terminal__dot terminal__dot--red"></span>
+          <span class="terminal__dot terminal__dot--yellow"></span>
+          <span class="terminal__dot terminal__dot--green"></span>
+          <span class="terminal__title">LLM interactive Q&A session</span>
+        </div>
+        <div class="terminal__body">
+<span class="prompt">$</span> <span class="cmd">ai-packet-analyzer capture.pcap --llm openai --interactive-llm</span>
+
+<span class="dim">  Running heuristic analysis... 8 findings</span>
+<span class="dim">  Sending to GPT-4o for deep analysis...</span>
+
+<span class="highlight">LLM Analysis:</span>
+<span class="dim">  The capture reveals an active compromise scenario. Host 10.0.0.5</span>
+<span class="dim">  is authenticating to multiple services using cleartext credentials</span>
+<span class="dim">  (FTP, Telnet, HTTP Basic Auth), while 10.0.0.99 is conducting</span>
+<span class="dim">  network reconnaissance via SYN scanning. The combination suggests</span>
+<span class="dim">  a post-exploitation lateral movement phase...</span>
+
+<span class="highlight">Your question:</span> <span class="cmd">Which host is most likely compromised?</span>
+<span class="highlight">Your question:</span> <span class="cmd">What firewall rules would contain this?</span>
+<span class="highlight">Your question:</span> <span class="cmd">quit</span>
+        </div>
+      </div>
+    </section>
+
+    <hr class="divider wrapper">
+
+    <!-- PRIVACY -->
+    <section class="section wrapper reveal">
+      <div class="two-col two-col--reverse">
+        <div class="two-col__text">
+          <div class="two-col__label">Privacy First</div>
+          <h2 class="two-col__title">Your Packets Stay Private</h2>
+          <p class="two-col__desc">The LLM never sees raw packet data. Only aggregated statistics, finding summaries, and metadata are sent. All actual packet payloads, IP addresses in raw form, and captured credentials stay on your machine.</p>
+          <ul class="check-list">
+            <li>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+              No raw packet payloads sent to LLM
+            </li>
+            <li>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+              Works fully offline with local LLMs
+            </li>
+            <li>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+              100% open source — audit the code yourself
+            </li>
+            <li>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+              MIT licensed, no telemetry, no tracking
+            </li>
+          </ul>
+        </div>
+        <div class="arch-diagram">
+          <div class="layer">
+            <span class="layer-name" style="color: var(--color-success);">Your Machine</span>
+            <span class="layer-desc">Raw packets, payloads, credentials</span>
+          </div>
+          <div class="arrow">&#x25BC; only stats + findings</div>
+          <div class="layer" style="border-color: color-mix(in srgb, var(--color-warning) 40%, var(--color-divider));">
+            <span class="layer-name" style="color: var(--color-warning);">LLM Provider</span>
+            <span class="layer-desc">Receives: packet counts, protocol distribution, severity-ranked findings, aggregated metadata</span>
+          </div>
+          <div class="arrow">&#x25BC; analysis results</div>
+          <div class="layer">
+            <span class="layer-name" style="color: var(--color-success);">Your Machine</span>
+            <span class="layer-desc">Root cause analysis, recommendations, compliance mapping</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <hr class="divider wrapper">
+
+    <!-- INSTALL -->
+    <section id="install" class="section wrapper reveal">
+      <div class="section__header">
+        <div class="section__label">Get Started</div>
+        <h2 class="section__title">Install in 30 Seconds</h2>
+      </div>
+
+      <div class="install-methods">
+        <div class="install-block">
+          <div class="install-block__header">pip install (recommended)</div>
+          <code><span class="comment"># One-line install from GitHub</span>
+pip install git+https://github.com/jph4cks/ai-packet-analyzer.git
+
+<span class="comment"># Run it</span>
+<span class="highlight">ai-packet-analyzer</span> capture.pcap</code>
+        </div>
+        <div class="install-block">
+          <div class="install-block__header">from source</div>
+          <code>git clone https://github.com/jph4cks/ai-packet-analyzer.git
+cd ai-packet-analyzer
+pip install -e .
+
+<span class="comment"># Run it</span>
+<span class="highlight">ai-packet-analyzer</span> capture.pcap --mode security</code>
+        </div>
+      </div>
+
+      <div class="install-block" style="margin-top: var(--space-6);">
+        <div class="install-block__header">with LLM integration</div>
+        <code><span class="comment"># OpenAI</span>
+export OPENAI_API_KEY="sk-your-key"
+<span class="highlight">ai-packet-analyzer</span> capture.pcap --llm openai --interactive-llm
+
+<span class="comment"># Local with Ollama (free, offline)</span>
+ollama pull llama3
+<span class="highlight">ai-packet-analyzer</span> capture.pcap --llm ollama
+
+<span class="comment"># Ask a specific question</span>
+<span class="highlight">ai-packet-analyzer</span> capture.pcap --llm anthropic --llm-question "Any signs of data exfiltration?"</code>
+      </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="cta wrapper reveal">
+      <h2 class="cta__title">Ready to automate your packet analysis?</h2>
+      <p class="cta__desc">AI Packet Analyzer is free, open source, and works on Linux, macOS, and Windows. Star it on GitHub or start using it today.</p>
+      <div class="hero__actions">
+        <a href="https://github.com/jph4cks/ai-packet-analyzer" target="_blank" rel="noopener noreferrer" class="btn btn--primary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.44 9.8 8.2 11.39.6.11.82-.26.82-.58v-2.03c-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.09-.75.08-.73.08-.73 1.21.08 1.85 1.24 1.85 1.24 1.07 1.84 2.81 1.31 3.5 1 .11-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.12-.3-.54-1.52.12-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 016.02 0c2.28-1.55 3.29-1.23 3.29-1.23.66 1.66.24 2.88.12 3.18.77.84 1.24 1.91 1.24 3.22 0 4.61-2.81 5.63-5.48 5.92.43.37.81 1.1.81 2.22v3.29c0 .32.21.7.82.58C20.57 21.8 24 17.3 24 12c0-6.63-5.37-12-12-12z"/></svg>
+          Star on GitHub
+        </a>
+        <a href="https://github.com/jph4cks/ai-packet-analyzer/releases" target="_blank" rel="noopener noreferrer" class="btn btn--ghost">
+          Download Binary
+        </a>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div class="wrapper">
+      <p class="footer__text">
+        Built by <a href="https://github.com/jph4cks" target="_blank" rel="noopener noreferrer">jph4cks</a> &middot;
+        MIT License &middot;
+        <a href="https://github.com/jph4cks/ai-packet-analyzer" target="_blank" rel="noopener noreferrer">GitHub</a>
+      </p>
+    </div>
+  </footer>
+
+  <script>
+    // Theme toggle
+    (function () {
+      const t = document.querySelector('[data-theme-toggle]'),
+        r = document.documentElement;
+      let d = matchMedia('(prefers-color-scheme:dark)').matches ? 'dark' : 'light';
+      r.setAttribute('data-theme', d);
+      t &&
+        t.addEventListener('click', () => {
+          d = d === 'dark' ? 'light' : 'dark';
+          r.setAttribute('data-theme', d);
+          t.setAttribute('aria-label', 'Switch to ' + (d === 'dark' ? 'light' : 'dark') + ' mode');
+          t.innerHTML =
+            d === 'dark'
+              ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>'
+              : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+        });
+    })();
+
+    // Scroll reveal
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          e.target.classList.add('visible');
+          observer.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+    document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+    // Smooth scroll for nav links
+    document.querySelectorAll('a[href^="#"]').forEach(a => {
+      a.addEventListener('click', e => {
+        e.preventDefault();
+        const target = document.querySelector(a.getAttribute('href'));
+        if (target) target.scrollIntoView({ behavior: 'smooth' });
+      });
+    });
+  </script>
+
+</body>
+</html>
