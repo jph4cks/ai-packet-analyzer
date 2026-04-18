@@ -236,7 +236,11 @@ Examples:
     if args.output:
         from .report_renderer import render_report_to_string
         output_text = render_report_to_string(report, verbose=args.verbose, llm_result=llm_result)
-        Path(args.output).write_text(output_text)
+        try:
+            Path(args.output).write_text(output_text, encoding="utf-8")
+        except OSError as e:
+            console.print(f"[bold red]Error saving report:[/bold red] {e}")
+            sys.exit(1)
         console.print(f"[green]Report saved to {args.output}[/green]")
 
 
