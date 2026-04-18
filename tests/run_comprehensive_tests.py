@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
 """Comprehensive test runner for AI Packet Analyzer.
-Tests all pcap files in both troubleshooting and security modes.
-Captures output and checks for crashes, errors, and expected detections.
+
+This is intentionally a black-box test harness: it runs the installed
+``ai-packet-analyzer`` CLI against pcaps under ``tests/pcaps``.
+
+Note: This runner is not auto-discovered by pytest; run it directly:
+
+  python3 tests/run_comprehensive_tests.py
+
 """
 
 import subprocess
