@@ -396,7 +396,8 @@ def parse_pcap(filepath: str | Path, max_packets: int | None = None) -> PacketSt
                                 "time": pkt_time,
                             })
                         except Exception:
-                            pass
+                            # Best-effort DNS parsing; malformed packet fields should not abort analysis.
+                            continue
 
                 elif dns.qr == 1:  # Response
                     rcode = dns.rcode
@@ -407,7 +408,8 @@ def parse_pcap(filepath: str | Path, max_packets: int | None = None) -> PacketSt
                         try:
                             query_name = dns.qd.qname.decode("utf-8", errors="ignore").rstrip(".")
                         except Exception:
-                            pass
+                            # Best-effort DNS parsing; malformed packet fields should not abort analysis.
+                            query_name = ""
 
                     if rcode != 0:
                         stats.dns_errors.append({
@@ -430,7 +432,8 @@ def parse_pcap(filepath: str | Path, max_packets: int | None = None) -> PacketSt
                                     "time": pkt_time,
                                 })
                             except Exception:
-                                pass
+                                # Best-effort DNS parsing; malformed packet fields should not abort analysis.
+                                continue
 
             # Check cleartext UDP protocols
             if pkt.haslayer(Raw):

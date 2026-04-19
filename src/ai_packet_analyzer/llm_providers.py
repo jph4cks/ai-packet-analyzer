@@ -165,8 +165,8 @@ def query_llm(config: LLMConfig, system_prompt: str, user_prompt: str) -> LLMRes
         error_body = ""
         try:
             error_body = e.read().decode("utf-8", errors="ignore")[:500]
-        except Exception:
-            pass
+        except Exception as read_err:
+            error_body = f"<unable to read HTTP error body: {read_err}>"
         return LLMResponse(
             content="",
             model=config.get_model(),
