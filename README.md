@@ -683,6 +683,10 @@ This project is licensed under the MIT License — see the [LICENSE](LICENSE) fi
 
 ---
 
+## Authorized Use
+
+Use this tool only on networks and traffic you own or have explicit permission to analyze.
+
 ## Disclaimer
 
 This tool is intended for authorized network analysis and security auditing only. Always ensure you have proper authorization before analyzing network traffic. The credential detection features are designed to help identify security weaknesses — never use this tool to intercept or access unauthorized communications.
