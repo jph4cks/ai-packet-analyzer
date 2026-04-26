@@ -33,3 +33,6 @@ release/
 *.pcapng
 tests/pcaps/smallFlows.pcap
 tests/pcaps/netresec_proxy.pcap
+
+# Test outputs
+tests/test_results.json

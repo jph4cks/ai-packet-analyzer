@@ -21,6 +21,7 @@ Instead of manually sifting through thousands of packets in Wireshark, point thi
 - [Quick Start](#quick-start)
 - [LLM Integration](#llm-integration)
   - [Supported Providers](#supported-providers)
+  - [Devin Terminal & direnv Compatibility](#devin-terminal--direnv-compatibility)
   - [Using OpenAI / ChatGPT](#using-openai--chatgpt)
   - [Using Anthropic / Claude](#using-anthropic--claude)
   - [Using OpenRouter](#using-openrouter)
@@ -293,16 +294,42 @@ No packet payloads or raw data are sent to the LLM — only aggregated statistic
 
 ### Supported Providers
 
-| Provider | Flag | Default Model | API Key Env Variable | Cost |
-|----------|------|---------------|---------------------|------|
-| **OpenAI** | `--llm openai` | `gpt-4o` | `OPENAI_API_KEY` | Paid API |
-| **Anthropic** | `--llm anthropic` | `claude-sonnet-4-20250514` | `ANTHROPIC_API_KEY` | Paid API |
-| **OpenRouter** | `--llm openrouter` | `anthropic/claude-sonnet-4` | `OPENROUTER_API_KEY` | Pay-per-token |
+| Provider | Flag | Default Model | API Key Env Variables (any of) | Cost |
+|----------|------|---------------|-------------------------------|------|
+| **OpenAI** | `--llm openai` | `gpt-4o` | `OPENAI_API_KEY`, `OPENAI_KEY`, `CHATGPT_API_KEY` | Paid API |
+| **Anthropic** | `--llm anthropic` | `claude-sonnet-4-20250514` | `ANTHROPIC_API_KEY`, `CLAUDE_API_KEY`, `ANTHROPIC_KEY` | Paid API |
+| **OpenRouter** | `--llm openrouter` | `anthropic/claude-sonnet-4` | `OPENROUTER_API_KEY`, `OPENROUTER_KEY`, `OR_API_KEY` | Pay-per-token |
 | **Ollama** | `--llm ollama` | `llama3` | None (local) | Free (local) |
 | **LM Studio** | `--llm lmstudio` | Depends on loaded model | None (local) | Free (local) |
 | **Any local server** | `--llm local` | `llama3` | None | Free (local) |
 
-Aliases: `chatgpt` → openai, `claude` → anthropic
+Provider aliases: `chatgpt` → openai, `claude` → anthropic, `ollama` / `lmstudio` → local.
+
+The analyzer accepts **any** of the environment variables listed for a provider — the first non-empty match wins, with the canonical name (first column entry) preferred. This way a single key set up for Aider, Claude Code, Codex, OpenCode, or [Devin Terminal](https://cli.devin.ai/) Just Works without re-exporting.
+
+### Devin Terminal & direnv Compatibility
+
+When the analyzer starts it automatically discovers `.envrc` and `.env` files in the current working directory and walks up to (but never past) your home directory. Variables from those files are merged into the environment, **without overwriting any existing exports** — explicit shell `export`s always win.
+
+This matches the convention [Devin Terminal recommends](https://docs.devin.ai/onboard-devin/repo-setup#configuring-environment-variables) for project secrets and the way [direnv](https://direnv.net) loads `.envrc` files. You don't need direnv installed; the analyzer ships its own dependency-free reader that supports `KEY=value`, `export KEY=value`, comments, and quoted values.
+
+Drop the analyzer onto a Devin-configured machine and it picks up your existing project secrets automatically:
+
+```bash
+# .envrc at the root of your project (Devin / direnv style)
+export OPENAI_API_KEY="sk-..."
+export ANTHROPIC_API_KEY="sk-ant-..."
+export OPENROUTER_API_KEY="sk-or-..."
+```
+
+```bash
+# Now any of these work without re-exporting:
+ai-packet-analyzer capture.pcap --llm openai
+ai-packet-analyzer capture.pcap --llm anthropic
+ai-packet-analyzer capture.pcap --llm openrouter
+```
+
+Disable the auto-loader with `--no-load-env` if you prefer to manage environment variables exclusively through your shell. Devin's own `WINDSURF_API_KEY` is **never** used as a model key — it's reserved for Devin's own auth and the analyzer only uses it (informationally) to detect a Devin-configured shell.
 
 ### Using OpenAI / ChatGPT
 
