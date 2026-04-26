@@ -1,3 +1,3 @@
 """AI Packet Analyzer - AI-powered network packet analysis for troubleshooting and security auditing."""
 
-__version__ = "1.2.0"
+__version__ = "1.2.1"

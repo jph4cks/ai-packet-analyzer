@@ -18,6 +18,11 @@ from rich import box
 from .packet_parser import parse_pcap, PacketStats
 from .ai_engine import analyze_connectivity, analyze_security, AnalysisReport
 from .report_renderer import render_report, render_llm_analysis
+from .env_loader import (
+    discover_env_files,
+    has_devin_terminal_auth,
+    load_project_env,
+)
 from .live_capture import (
     LiveCaptureError,
     LiveCaptureOptions,
@@ -216,8 +221,38 @@ Examples:
         action="store_true",
         help="List all supported LLM providers and exit.",
     )
+    llm_group.add_argument(
+        "--no-load-env",
+        action="store_true",
+        help=(
+            "Disable automatic loading of .envrc/.env files from the current "
+            "directory and parents up to your home (compatible with Devin "
+            "Terminal / direnv conventions). Explicit shell exports are "
+            "unaffected."
+        ),
+    )
 
     args = parser.parse_args()
+
+    # Load .envrc / .env files from CWD and parents (Devin / direnv style).
+    # Existing exports always win, so this is safe to run unconditionally.
+    if not args.no_load_env:
+        try:
+            loaded = load_project_env()
+        except Exception:  # pragma: no cover - never crash the CLI on env load
+            loaded = {}
+        if loaded:
+            files = discover_env_files()
+            console.print(
+                f"[dim]Loaded {len(loaded)} variable(s) from "
+                f"{', '.join(str(f) for f in files)}[/dim]"
+            )
+        elif has_devin_terminal_auth() and args.verbose:
+            console.print(
+                "[dim]Devin Terminal detected. No .envrc/.env file found in "
+                "this project tree \u2014 set OPENAI_API_KEY / ANTHROPIC_API_KEY / "
+                "OPENROUTER_API_KEY in one to share keys with the analyzer.[/dim]"
+            )
 
     # Handle --list-providers
     if args.list_providers:
@@ -493,19 +528,16 @@ def _offer_llm_interactively(stats, report, mode, args):
 
     api_key = None
     if provider != "local":
-        from .llm_providers import ENV_KEYS, LLMProvider
-        provider_enum = {
-            "openai": LLMProvider.OPENAI,
-            "anthropic": LLMProvider.ANTHROPIC,
-            "openrouter": LLMProvider.OPENROUTER,
-        }.get(provider)
-        env_var = ENV_KEYS.get(provider_enum, "")
-        existing_key = __import__("os").environ.get(env_var, "")
+        from .env_loader import PROVIDER_ENV_ALIASES, resolve_api_key
+        existing_key, env_var = resolve_api_key(provider)
+        canonical = PROVIDER_ENV_ALIASES.get(provider, ("API_KEY",))[0]
 
         if existing_key:
             console.print(f"  [green]Using API key from {env_var}[/green]")
         else:
-            api_key = Prompt.ask(f"[bold]Enter your API key[/bold] (or set {env_var})")
+            api_key = Prompt.ask(
+                f"[bold]Enter your API key[/bold] (or set {canonical})"
+            )
 
     model = Prompt.ask("[bold]Model name[/bold] (press Enter for default)", default="")
     model = model.strip() or None

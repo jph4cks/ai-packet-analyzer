@@ -15,6 +15,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
+from .env_loader import PROVIDER_ENV_ALIASES, resolve_api_key
+
 
 class LLMProvider(Enum):
     """Supported LLM providers."""
@@ -40,7 +42,13 @@ PROVIDER_ENDPOINTS = {
     LLMProvider.LOCAL: "http://localhost:11434/api/chat",  # Ollama default
 }
 
-# Environment variable names for API keys
+# Canonical environment variable name for each provider's API key.
+#
+# This is kept for backward compatibility with code/tests that reference
+# ``ENV_KEYS`` directly. Resolution at runtime now goes through
+# :func:`ai_packet_analyzer.env_loader.resolve_api_key`, which also accepts
+# alternate aliases (e.g. ``CLAUDE_API_KEY`` for Anthropic) so a key set up
+# for Aider, Claude Code, Codex, OpenCode, or Devin's ``.envrc`` Just Works.
 ENV_KEYS = {
     LLMProvider.OPENAI: "OPENAI_API_KEY",
     LLMProvider.ANTHROPIC: "ANTHROPIC_API_KEY",
@@ -71,13 +79,36 @@ class LLMConfig:
         return PROVIDER_ENDPOINTS[self.provider]
 
     def get_api_key(self) -> str | None:
-        """Get the API key from config or environment."""
+        """Get the API key from config or environment.
+
+        Resolution order:
+
+        1. ``self.api_key`` (set via ``--llm-api-key`` or programmatically)
+        2. The provider's canonical env var (e.g. ``OPENAI_API_KEY``)
+        3. Any documented aliases (e.g. ``CLAUDE_API_KEY`` for Anthropic) —
+           see :data:`ai_packet_analyzer.env_loader.PROVIDER_ENV_ALIASES`.
+
+        This means a single ``.envrc`` written for Aider, Claude Code,
+        Codex, OpenCode, or Devin Terminal works without modification.
+        """
         if self.api_key:
             return self.api_key
-        env_var = ENV_KEYS.get(self.provider)
-        if env_var:
-            return os.environ.get(env_var)
-        return None
+        if self.provider == LLMProvider.LOCAL:
+            return None
+        value, _ = resolve_api_key(self.provider.value)
+        return value
+
+    def get_api_key_source(self) -> str | None:
+        """Return the env var name that supplied the key, or None.
+
+        Used for friendly logging like ``Using API key from CLAUDE_API_KEY``.
+        Returns ``None`` if the key came from ``self.api_key`` or no key is
+        available.
+        """
+        if self.api_key or self.provider == LLMProvider.LOCAL:
+            return None
+        _, name = resolve_api_key(self.provider.value)
+        return name
 
     @classmethod
     def from_args(
@@ -196,12 +227,14 @@ def _query_openai_compatible(config: LLMConfig, system_prompt: str, user_prompt:
     """Query OpenAI or OpenRouter (both use OpenAI-compatible API)."""
     api_key = config.get_api_key()
     if not api_key:
-        env_var = ENV_KEYS.get(config.provider, "API_KEY")
         return LLMResponse(
             content="",
             model=config.get_model(),
             provider=config.provider.value,
-            error=f"No API key found. Set --llm-api-key or the {env_var} environment variable.",
+            error=(
+                "No API key found. Set --llm-api-key or one of: "
+                f"{', '.join(_aliases_for(config.provider)) or 'API_KEY'}."
+            ),
             success=False,
         )
 
@@ -256,7 +289,10 @@ def _query_anthropic(config: LLMConfig, system_prompt: str, user_prompt: str) ->
             content="",
             model=config.get_model(),
             provider="anthropic",
-            error="No API key found. Set --llm-api-key or the ANTHROPIC_API_KEY environment variable.",
+            error=(
+                "No API key found. Set --llm-api-key or one of: "
+                f"{', '.join(_aliases_for(LLMProvider.ANTHROPIC))}."
+            ),
             success=False,
         )
 
@@ -410,13 +446,19 @@ def validate_config(config: LLMConfig) -> tuple[bool, str]:
     if config.provider != LLMProvider.LOCAL:
         api_key = config.get_api_key()
         if not api_key:
-            env_var = ENV_KEYS.get(config.provider, "API_KEY")
+            aliases = _aliases_for(config.provider)
+            alias_str = ", ".join(aliases) if aliases else "API_KEY"
             return False, (
                 f"No API key for {config.provider.value}. "
-                f"Set --llm-api-key or the {env_var} environment variable."
+                f"Set --llm-api-key or one of: {alias_str}."
             )
 
     return True, ""
+
+
+def _aliases_for(provider: LLMProvider) -> tuple[str, ...]:
+    """Return the documented env var aliases for ``provider`` (canonical first)."""
+    return PROVIDER_ENV_ALIASES.get(provider.value, ())
 
 
 def list_providers() -> str:
@@ -424,13 +466,21 @@ def list_providers() -> str:
     lines = []
     lines.append("Supported LLM Providers:")
     lines.append("")
-    lines.append("  Provider     │ Default Model              │ Env Variable          │ Endpoint")
-    lines.append("  ─────────────┼────────────────────────────┼───────────────────────┼─────────────────────────────")
+    lines.append("  Provider     │ Default Model              │ Env Variables (aliases accepted)")
+    lines.append("  ─────────────┼────────────────────────────┼──────────────────────────────────────────")
     for provider in LLMProvider:
         model = DEFAULT_MODELS[provider]
-        env = ENV_KEYS.get(provider, "—") or "— (none needed)"
-        endpoint = PROVIDER_ENDPOINTS[provider]
-        lines.append(f"  {provider.value:<12} │ {model:<26} │ {env:<21} │ {endpoint}")
+        aliases = _aliases_for(provider)
+        env = ", ".join(aliases) if aliases else "— (none needed)"
+        lines.append(f"  {provider.value:<12} │ {model:<26} │ {env}")
     lines.append("")
-    lines.append("  Aliases: chatgpt → openai, claude → anthropic, ollama/lmstudio → local")
+    lines.append("  Provider aliases: chatgpt → openai, claude → anthropic, ollama/lmstudio → local")
+    lines.append("")
+    lines.append("  Endpoints:")
+    for provider in LLMProvider:
+        lines.append(f"    {provider.value:<12} → {PROVIDER_ENDPOINTS[provider]}")
+    lines.append("")
+    lines.append("  The first env variable listed is the canonical one. Any alias works — useful")
+    lines.append("  when reusing a key set up for Aider, Claude Code, Codex, OpenCode, or Devin")
+    lines.append("  Terminal (which recommends a project-level `.envrc` for secrets).")
     return "\n".join(lines)
