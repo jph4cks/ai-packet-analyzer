@@ -63,6 +63,16 @@ Instead of manually sifting through thousands of packets in Wireshark, point thi
 - **Port Scan Detection** — Alerts when a host connects to an unusually large number of ports
 - **Smart Context Narrowing** — When multiple issues are found, prompts for problem description, IPs, and ports to focus the analysis
 
+### Live Capture (new in v1.2)
+- **Real-time packet capture** — Sniff packets directly from a network interface instead of parsing a pcap file
+- **Same analysis pipeline** — Live captures feed the exact same heuristic and LLM analyzers used for offline pcaps
+- **Live Rich dashboard** — Continuously refreshing TUI shows packet rate, top talkers, protocol mix, and live security alerts
+- **Flexible stop conditions** — Stop after a packet count, a duration, or `Ctrl+C` (graceful shutdown)
+- **BPF filtering** — Apply Berkeley Packet Filter expressions (`tcp port 80`, `host 10.0.0.5 and not arp`, etc.)
+- **Save while capturing** — Optionally write captured packets to a pcap file for later replay or sharing
+- **Cross-platform** — Linux (root or `CAP_NET_RAW`), macOS (ChmodBPF), Windows (Npcap)
+- **Headless mode** — `--no-live-ui` flag for CI / scripted captures without the dashboard
+
 ### Security Audit
 - **Cleartext Protocol Detection** — Flags use of HTTP, FTP, Telnet, SMTP, POP3, IMAP, LDAP, SNMP, VNC, and other unencrypted protocols
 - **Credential Extraction** — Finds passwords, usernames, API keys, tokens, session IDs, and cookies transmitted in cleartext
@@ -194,7 +204,84 @@ ai-packet-analyzer capture.pcap --mode security
 # With LLM deep analysis (any provider)
 ai-packet-analyzer capture.pcap --llm openai --mode security
 ai-packet-analyzer capture.pcap --llm ollama --llm-model llama3
+
+# Live capture: sniff for 60 seconds on eth0 and run a security audit
+sudo ai-packet-analyzer --live -i eth0 -t 60 --mode security
 ```
+
+---
+
+## Live Capture Mode
+
+Starting in v1.2, the analyzer can sniff packets directly from a network interface instead of reading a pcap file. Live captures use the same `PacketStats` data model and feed the same heuristic and LLM analyzers, so every check (cleartext credentials, TCP failures, DNS errors, port scans, ARP spoofing, etc.) works out of the box.
+
+### Privileges
+
+Live capture needs raw socket access:
+
+| Platform | Requirement |
+|----------|-------------|
+| **Linux** | Run with `sudo`, **or** grant capabilities once: `sudo setcap cap_net_raw,cap_net_admin=eip $(readlink -f $(which python3))` |
+| **macOS** | Run with `sudo`, **or** install ChmodBPF (bundled with Wireshark) so `/dev/bpf*` is group-readable |
+| **Windows** | Install [Npcap](https://npcap.com) in WinPcap-compatible mode |
+
+The tool runs a privilege check at startup and prints a friendly hint if it suspects insufficient permissions.
+
+### CLI Flags
+
+| Flag | Description |
+|------|-------------|
+| `--live` | Enable live capture mode. Mutually exclusive with a `pcap_file` argument. |
+| `-i, --interface IFACE` | Interface to capture on (e.g. `eth0`, `wlan0`). Defaults to Scapy's default interface. |
+| `-t, --duration SECONDS` | Stop capture after N seconds. |
+| `--packet-count N` | Stop capture after N packets. |
+| `-f, --bpf-filter EXPR` | Berkeley Packet Filter expression (e.g. `"tcp port 80"`). |
+| `--save-pcap FILE` | Write captured packets to FILE while capturing, for later replay. |
+| `--list-interfaces` | Print available interfaces and exit. |
+| `--no-live-ui` | Disable the Rich dashboard (useful for headless / CI runs). |
+
+If neither `--duration` nor `--packet-count` is set, capture runs until you press `Ctrl+C` and exits gracefully.
+
+### Examples
+
+```bash
+# List available interfaces
+ai-packet-analyzer --list-interfaces
+
+# Capture 500 packets on eth0, then run a security audit
+sudo ai-packet-analyzer --live -i eth0 --packet-count 500 --mode security
+
+# Capture all HTTP traffic for 60 seconds, save to a pcap, and run an LLM analysis afterward
+sudo ai-packet-analyzer --live -i wlan0 -t 60 -f "tcp port 80" \
+    --save-pcap http_traffic.pcap --llm openai --mode security
+
+# Capture indefinitely until Ctrl+C, troubleshooting mode, no live UI (e.g. inside a SSH session)
+sudo ai-packet-analyzer --live -i eth0 --mode troubleshoot --no-live-ui
+
+# Capture only ARP traffic to investigate a suspected spoofing attack
+sudo ai-packet-analyzer --live -i eth0 -f "arp" -t 30 --mode security
+```
+
+### Live Dashboard
+
+While capture is running, the Rich-powered dashboard refreshes several times per second and shows:
+
+- Total packets / total bytes / packets-per-second
+- TCP / UDP / ICMP / ARP / DNS / Other counters
+- TCP SYN / SYN-ACK / RST counts (live red-flag for connection floods)
+- Cleartext sessions detected so far
+- Potential credentials detected (red, blinking)
+- Top 5 source IPs by packet count
+- Top 5 protocols by packet count
+- Capture interface, BPF filter, and elapsed time
+
+When capture stops, the same heuristic and LLM analysis pipeline used for pcap files runs against the captured stats and prints the standard report.
+
+### Notes
+
+- Live capture stores **only** structured metadata in memory by default. Use `--save-pcap` if you also want a raw pcap on disk.
+- Promiscuous mode is enabled where the OS supports it. Some virtualised environments may silently restrict promiscuous mode.
+- For unattended / scripted captures, prefer `--packet-count` or `--duration` so the process always terminates cleanly.
 
 ---
 

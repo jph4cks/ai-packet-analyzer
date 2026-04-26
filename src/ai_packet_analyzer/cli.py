@@ -18,6 +18,12 @@ from rich import box
 from .packet_parser import parse_pcap, PacketStats
 from .ai_engine import analyze_connectivity, analyze_security, AnalysisReport
 from .report_renderer import render_report, render_llm_analysis
+from .live_capture import (
+    LiveCaptureError,
+    LiveCaptureOptions,
+    check_capture_privileges,
+    list_interfaces,
+)
 
 
 console = Console()
@@ -61,6 +67,12 @@ Examples:
 
   # Filtering
   ai-packet-analyzer capture.pcap --mode troubleshoot --ip 192.168.1.10 --port 80
+
+  # Live capture (requires root / Npcap)
+  sudo ai-packet-analyzer --live -i eth0 --packet-count 500 --mode security
+  sudo ai-packet-analyzer --live -i wlan0 -t 60 -f "tcp port 80" \
+      --save-pcap http_traffic.pcap
+  ai-packet-analyzer --list-interfaces
         """,
     )
     parser.add_argument(
@@ -103,6 +115,51 @@ Examples:
     parser.add_argument(
         "--output", "-o",
         help="Save report output to a text file.",
+    )
+
+    # ─── Live Capture Options ───
+    live_group = parser.add_argument_group("Live Capture")
+    live_group.add_argument(
+        "--live",
+        action="store_true",
+        help="Capture packets from a live network interface instead of reading a pcap file.",
+    )
+    live_group.add_argument(
+        "--interface", "-i",
+        metavar="IFACE",
+        help="Network interface to capture on (e.g. eth0, wlan0). Defaults to Scapy's default.",
+    )
+    live_group.add_argument(
+        "--duration", "-t",
+        type=float,
+        metavar="SECONDS",
+        help="Stop live capture after N seconds. Combine with --packet-count if desired.",
+    )
+    live_group.add_argument(
+        "--packet-count",
+        type=int,
+        metavar="N",
+        help="Stop live capture after N packets.",
+    )
+    live_group.add_argument(
+        "--bpf-filter", "-f",
+        metavar="EXPR",
+        help='Berkeley Packet Filter expression (e.g. "tcp port 80").',
+    )
+    live_group.add_argument(
+        "--save-pcap",
+        metavar="FILE",
+        help="Write captured packets to FILE while capturing (for later replay).",
+    )
+    live_group.add_argument(
+        "--list-interfaces",
+        action="store_true",
+        help="List available capture interfaces and exit.",
+    )
+    live_group.add_argument(
+        "--no-live-ui",
+        action="store_true",
+        help="Disable the live-capture Rich dashboard (useful for headless or CI usage).",
     )
 
     # ─── LLM Options ───
@@ -168,6 +225,28 @@ Examples:
         console.print(list_providers())
         sys.exit(0)
 
+    # Handle --list-interfaces
+    if args.list_interfaces:
+        ifaces = list_interfaces()
+        if not ifaces:
+            console.print("[yellow]No interfaces detected. Live capture may require root/Npcap.[/yellow]")
+        else:
+            console.print("[bold cyan]Available capture interfaces:[/bold cyan]")
+            for iface in ifaces:
+                console.print(f"  - {iface}")
+        sys.exit(0)
+
+    # Validate live vs pcap mutually-exclusive usage
+    if args.live and args.pcap_file:
+        console.print(
+            "[bold red]Error:[/bold red] --live and a pcap file are mutually exclusive. "
+            "Choose one or the other."
+        )
+        sys.exit(2)
+    if not args.live and not args.pcap_file:
+        # Allowed: prompt for pcap path interactively (existing behavior).
+        pass
+
     # Show banner
     console.print(BANNER, style="bold cyan")
     console.print(Panel(
@@ -178,29 +257,40 @@ Examples:
     ))
     console.print()
 
-    # Get pcap file
-    pcap_path = args.pcap_file
-    if not pcap_path:
-        pcap_path = Prompt.ask("[bold cyan]Enter the path to the pcap file[/bold cyan]")
+    # Either run live capture or parse an existing pcap.
+    if args.live:
+        stats = _run_live_capture(args)
+        if stats is None:
+            sys.exit(1)
+        if stats.total_packets == 0:
+            console.print(
+                "[bold yellow]No packets were captured.[/bold yellow] "
+                "Check the interface, BPF filter, and that traffic is flowing."
+            )
+            sys.exit(0)
+    else:
+        pcap_path = args.pcap_file
+        if not pcap_path:
+            pcap_path = Prompt.ask("[bold cyan]Enter the path to the pcap file[/bold cyan]")
 
-    pcap_path = Path(pcap_path)
-    if not pcap_path.exists():
-        console.print(f"[bold red]Error:[/bold red] File not found: {pcap_path}")
-        sys.exit(1)
+        pcap_path = Path(pcap_path)
+        if not pcap_path.exists():
+            console.print(f"[bold red]Error:[/bold red] File not found: {pcap_path}")
+            sys.exit(1)
 
-    if not pcap_path.suffix.lower() in (".pcap", ".pcapng", ".cap"):
-        console.print("[bold yellow]Warning:[/bold yellow] File does not have a standard pcap extension. Attempting to parse anyway...")
+        if not pcap_path.suffix.lower() in (".pcap", ".pcapng", ".cap"):
+            console.print("[bold yellow]Warning:[/bold yellow] File does not have a standard pcap extension. Attempting to parse anyway...")
 
-    # Parse pcap
-    console.print(f"\n[bold]Parsing[/bold] {pcap_path.name}...")
-    try:
-        stats = parse_pcap(str(pcap_path), max_packets=args.max_packets)
-    except Exception as e:
-        console.print(f"[bold red]Error parsing pcap file:[/bold red] {e}")
-        sys.exit(1)
+        # Parse pcap
+        console.print(f"\n[bold]Parsing[/bold] {pcap_path.name}...")
+        try:
+            stats = parse_pcap(str(pcap_path), max_packets=args.max_packets)
+        except Exception as e:
+            console.print(f"[bold red]Error parsing pcap file:[/bold red] {e}")
+            sys.exit(1)
 
-    console.print(f"[green]Loaded {stats.total_packets:,} packets[/green] ({stats.total_bytes:,} bytes, {stats.duration_seconds:.2f}s)")
-    console.print()
+        console.print(f"[green]Loaded {stats.total_packets:,} packets[/green] ({stats.total_bytes:,} bytes, {stats.duration_seconds:.2f}s)")
+        console.print()
 
     # Determine mode
     mode = args.mode
@@ -242,6 +332,65 @@ Examples:
             console.print(f"[bold red]Error saving report:[/bold red] {e}")
             sys.exit(1)
         console.print(f"[green]Report saved to {args.output}[/green]")
+
+
+def _run_live_capture(args) -> PacketStats | None:
+    """Run a live capture session and return PacketStats.
+
+    Prints a privilege check, runs the dashboard (or a headless capture when
+    ``--no-live-ui`` is set), and returns the resulting stats. Returns ``None``
+    on a fatal error so the caller can exit with a non-zero status.
+    """
+    if args.duration is None and args.packet_count is None:
+        console.print(
+            "[yellow]Note:[/yellow] no --duration or --packet-count specified. "
+            "Capture will run until you press Ctrl+C.\n"
+        )
+
+    ok, hint = check_capture_privileges()
+    if not ok:
+        console.print(f"[yellow]Privilege check:[/yellow] {hint}\n")
+
+    options = LiveCaptureOptions(
+        interface=args.interface,
+        bpf_filter=args.bpf_filter,
+        packet_count=args.packet_count,
+        duration_seconds=args.duration,
+        save_pcap=args.save_pcap,
+    )
+
+    iface_label = options.interface or "default"
+    filter_label = options.bpf_filter or "none"
+    console.print(
+        f"[bold cyan]Starting live capture[/bold cyan] on "
+        f"[bold]{iface_label}[/bold] (filter: [bold]{filter_label}[/bold])"
+    )
+    if options.save_pcap:
+        console.print(f"  Saving packets to: [bold]{options.save_pcap}[/bold]")
+    console.print()
+
+    try:
+        if args.no_live_ui:
+            from .live_capture import capture_live
+            stats = capture_live(options)
+        else:
+            from .live_ui import run_live_capture_with_ui
+            stats = run_live_capture_with_ui(options, console=console)
+    except LiveCaptureError as exc:
+        console.print(f"[bold red]Capture error:[/bold red] {exc}")
+        return None
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Capture interrupted by user.[/yellow]")
+        return None
+
+    console.print(
+        f"\n[green]Capture complete:[/green] {stats.total_packets:,} packets, "
+        f"{stats.total_bytes:,} bytes, {stats.duration_seconds:.2f}s"
+    )
+    if args.save_pcap:
+        console.print(f"[green]Saved capture to {args.save_pcap}[/green]")
+    console.print()
+    return stats
 
 
 def _interactive_mode_selection() -> str:
