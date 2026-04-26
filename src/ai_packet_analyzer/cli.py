@@ -33,6 +33,14 @@ from .live_capture import (
 
 console = Console()
 
+
+def _write_report_output(path: str, output_text: str) -> None:
+    """Write report output to the given path, creating parent directories."""
+    out_path = Path(path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(output_text, encoding="utf-8")
+
+
 BANNER = r"""
     _    ___   ____            _        _
    / \  |_ _| |  _ \ __ _  ___| | _____| |_
@@ -362,7 +370,7 @@ Examples:
         from .report_renderer import render_report_to_string
         output_text = render_report_to_string(report, verbose=args.verbose, llm_result=llm_result)
         try:
-            Path(args.output).write_text(output_text, encoding="utf-8")
+            _write_report_output(args.output, output_text)
         except OSError as e:
             console.print(f"[bold red]Error saving report:[/bold red] {e}")
             sys.exit(1)
