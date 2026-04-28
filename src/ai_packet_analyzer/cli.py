@@ -235,9 +235,10 @@ Examples:
     # Save to file
     if args.output:
         from .report_renderer import render_report_to_string
+
         output_text = render_report_to_string(report, verbose=args.verbose, llm_result=llm_result)
         try:
-            Path(args.output).write_text(output_text, encoding="utf-8")
+            _write_report_output(args.output, output_text)
         except OSError as e:
             console.print(f"[bold red]Error saving report:[/bold red] {e}")
             sys.exit(1)
